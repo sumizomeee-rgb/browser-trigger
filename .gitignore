@@ -1,0 +1,27 @@
+# 本机运行环境、浏览器档案和历史实验
+/.local/
+/reference/
+
+# 本地配置、个人规则和凭据
+.env
+.env.*
+*.local.json
+/config.json
+/rules*.json
+/credentials*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# 调查、截图、日志和测试产物
+/tmp/
+/screenshots/
+/logs/
+/test-results/
+/playwright-report/
+*.log
+*.har
+*.safeedit.bak
+Thumbs.db
+.DS_Store

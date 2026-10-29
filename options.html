@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>页面触发器</title>
+  <link rel="stylesheet" href="options.css">
+  <script type="module" src="options.mjs"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="masthead">
+      <a class="brand" href="options.html"><span class="brand-mark" aria-hidden="true">↻</span> 页面触发器<span class="brand-en">BROWSER TRIGGER</span></a>
+      <span class="local-tag"><i></i> 本地运行</span>
+    </header>
+    <main>
+      <section class="intro">
+        <div><p class="eyebrow">按你的节奏</p><h1>给页面安排一次刷新。</h1><p class="lead">选择已打开的页签，设定间隔，逐条掌握启停。</p></div>
+        <button id="add-rule" class="primary"><span aria-hidden="true">＋</span> 新增条目</button>
+      </section>
+      <section class="rules-panel" aria-labelledby="rules-title">
+        <div class="panel-heading"><h2 id="rules-title">刷新条目 <span id="rule-count">0</span></h2><div class="panel-tools"><span id="active-count">尚未启用定时</span><button id="refresh-list" class="text-button">更新列表</button></div></div>
+        <div id="empty" class="empty" hidden><div class="empty-mark" aria-hidden="true">↻</div><h3>先添加一个刷新条目</h3><p>新增条目默认暂停，准备好后再启用。</p><button id="empty-add" class="secondary">新增第一个条目</button></div>
+        <div class="table-wrap"><table id="rules-table" hidden><thead><tr><th>条目 / 目标</th><th>动作 / 间隔</th><th>定时</th><th>上次结果</th><th class="align-right">操作</th></tr></thead><tbody id="rules-body"></tbody></table></div>
+        <div id="loading" class="loading">正在读取条目…</div>
+      </section>
+      <div class="notes"><p><span aria-hidden="true">↳</span> 没有匹配页面时等待；多个匹配时先选定一个。</p><p>休眠可能延后执行，恢复后不补刷遗漏次数。</p></div>
+      <p class="result-note">“已发送刷新请求”只表示请求已提交，不代表页面加载完成或登录有效。</p>
+    </main>
+    <footer><span>独立页面触发 · v0.1.0</span><span>关闭绑定页签会暂停定时</span></footer>
+  </div>
+  <dialog id="editor" aria-labelledby="editor-title">
+    <form id="rule-form">
+      <div class="dialog-heading"><div><p class="eyebrow">刷新安排</p><h2 id="editor-title">新增条目</h2></div><button type="button" id="close-editor" class="icon-button" aria-label="关闭编辑">×</button></div>
+      <label for="rule-name">条目名称</label><input id="rule-name" maxlength="60" placeholder="例如：工作看板" required>
+      <fieldset><legend>目标</legend><div class="segmented"><label><input type="radio" name="mode" value="tab" checked><span>选择已打开页签</span></label><label><input type="radio" name="mode" value="address"><span>输入网站地址</span></label></div></fieldset>
+      <div id="tab-fields"><label for="tab-select">目标页签 <button type="button" id="refresh-tabs" class="text-button">更新页签</button></label><select id="tab-select"><option value="">请选择一个页签</option></select><p class="field-hint">只刷新选中页签。关闭后暂停，浏览器重启后须重新选择。</p></div>
+      <div id="address-fields" hidden><label for="target-address">网站或页面地址</label><input id="target-address" type="text" placeholder="https://example.com"><p id="address-hint" class="field-hint">网站根地址匹配同站点；带路径或查询参数时精确匹配页面，忽略 # 后内容。</p><div id="match-preview" class="match-preview" aria-live="polite"></div></div>
+      <div class="form-row"><div><label for="rule-action">动作</label><select id="rule-action"><option value="normal">普通刷新</option><option value="hard">强制刷新 · 绕过缓存</option></select></div><div><label for="rule-minutes">间隔 / 分钟</label><input id="rule-minutes" type="number" min="1" max="10080" step="any" value="5" required></div></div>
+      <p class="save-note">保存后保持暂停。可先执行一次，再开启定时。</p><p id="form-error" class="error" role="alert"></p>
+      <div class="dialog-actions"><button type="button" id="cancel-editor" class="secondary">取消</button><button type="submit" id="save-rule" class="primary">保存条目</button></div>
+    </form>
+  </dialog>
+  <dialog id="delete-dialog" aria-labelledby="delete-title"><form method="dialog"><h2 id="delete-title">删除这个条目？</h2><p id="delete-name"></p><p class="field-hint">该条目的定时安排也会移除。</p><div class="dialog-actions"><button value="cancel" class="secondary">保留</button><button value="delete" class="danger">删除条目</button></div></form></dialog>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
