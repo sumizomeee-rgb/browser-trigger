@@ -29,7 +29,7 @@ export function validateDraft(draft) {
   const minutes = Number(draft.minutes);
   if (!name || name.length > 60) throw new Error('名称请填写 1 至 60 个字符。');
   if (!Number.isFinite(minutes) || minutes < 1 || minutes > 10080) throw new Error('刷新间隔须为 1 至 10080 分钟。');
-  if (!['normal', 'hard'].includes(draft.action)) throw new Error('请选择刷新动作。');
+  if (!['normal', 'hard', 'ensure'].includes(draft.action)) throw new Error('请选择刷新或保活动作。');
   if (!['address', 'tab'].includes(draft.mode)) throw new Error('请选择目标方式。');
   return { name, minutes, action: draft.action };
 }

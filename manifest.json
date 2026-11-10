@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "页面触发器 · Browser Trigger",
-  "description": "为已打开的页签安排普通刷新或绕过缓存刷新。目标明确，逐条启停。",
-  "version": "0.1.0",
+  "description": "定时刷新与网页保活：浏览器启动及定时检查时，自动补开登记的页面。",
+  "version": "0.2.0",
   "minimum_chrome_version": "120",
   "permissions": ["alarms", "storage", "tabs"],
   "background": { "service_worker": "background.mjs", "type": "module" },

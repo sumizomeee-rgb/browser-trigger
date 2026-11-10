@@ -49,7 +49,7 @@ function render() {
     const target = document.createElement('td');
     target.append(text('div', rule.name, 'rule-name'), text('div', rule.target.mode === 'tab' ? '指定页签' : rule.target.match === 'site' ? '网站匹配' : '页面地址匹配', 'target-type'), text('div', rule.target.url, 'target-url'));
     const timing = document.createElement('td');
-    timing.append(text('div', rule.action === 'hard' ? '强制刷新' : '普通刷新'), text('div', `每 ${rule.minutes} 分钟`, 'interval'));
+    timing.append(text('div', rule.action === 'ensure' ? '保活 · 缺失时打开' : rule.action === 'hard' ? '强制刷新' : '普通刷新'), text('div', `每 ${rule.minutes} 分钟`, 'interval'));
     const status = document.createElement('td');
     const toggle = action('', 'toggle', rule.id, 'toggle');
     toggle.setAttribute('role', 'switch');
@@ -89,6 +89,9 @@ function updateTargetFields() {
   $('#address-fields').hidden = mode !== 'address';
   $('#tab-select').required = mode === 'tab';
   $('#target-address').required = mode === 'address';
+  $('#tab-hint').textContent = $('#rule-action').value === 'ensure'
+    ? '保存该页签的网址。浏览器重启后仍会检查，缺失时自动补开，不绑定旧页签 ID。'
+    : '只刷新选中页签。关闭后暂停，浏览器重启后须重新选择。';
   previewAddress();
 }
 function previewAddress() {
@@ -99,8 +102,9 @@ function previewAddress() {
   try {
     const target = addressTarget($('#target-address').value);
     const count = state.tabs.filter(tab => matchesTarget(target, tab.url)).length;
-    preview.textContent = `${target.match === 'site' ? '匹配网站' : '精确页面'}：${target.match === 'site' ? new URL(target.url).origin : target.url}。${count === 0 ? '当前没有匹配页签，将等待。' : count === 1 ? '当前匹配 1 个页签。' : `当前匹配 ${count} 个页签，请切换到“选择已打开页签”指定一个。`}`;
-    preview.classList.toggle('warning', count > 1);
+    const ensure = $('#rule-action').value === 'ensure';
+    preview.textContent = `${target.match === 'site' ? '匹配网站' : '精确页面'}：${target.match === 'site' ? new URL(target.url).origin : target.url}。${ensure ? count ? `已有 ${count} 个匹配页签，不会重复打开。` : '缺失时会自动打开。' : count === 0 ? '当前没有匹配页签，将等待。' : count === 1 ? '当前匹配 1 个页签。' : `当前匹配 ${count} 个页签，请切换到“选择已打开页签”指定一个。`}`;
+    preview.classList.toggle('warning', !ensure && count > 1);
   } catch { preview.textContent = '请填写有效的网站或页面地址。'; preview.classList.add('warning'); }
 }
 async function openEditor(id = null) {
@@ -129,6 +133,7 @@ $('#refresh-tabs').addEventListener('click', async () => {
   try { await refresh(); fillTabs(selected); previewAddress(); } catch (error) { toast(error.message, true); }
 });
 for (const radio of document.querySelectorAll('input[name=mode]')) radio.addEventListener('change', updateTargetFields);
+$('#rule-action').addEventListener('change', updateTargetFields);
 $('#target-address').addEventListener('input', previewAddress);
 $('#rule-form').addEventListener('submit', async event => {
   event.preventDefault();

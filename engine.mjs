@@ -77,8 +77,13 @@ export function createEngine(api, { now = () => Date.now(), newId = () => crypto
       if (!availableTabs([tab]).length || (tab.pendingUrl && pageUrl(tab.pendingUrl) !== pageUrl(tab.url))) {
         throw new Error('所选页签正在跳转或不支持，请重新选择。');
       }
-      target = { mode: 'tab', match: 'page', url: pageUrl(tab.url), title: tab.title ?? '' };
-      bindings[id] = { tabId: tab.id, url: target.url };
+      if (values.action === 'ensure') {
+        target = addressTarget(tab.url);
+        delete bindings[id];
+      } else {
+        target = { mode: 'tab', match: 'page', url: pageUrl(tab.url), title: tab.title ?? '' };
+        bindings[id] = { tabId: tab.id, url: target.url };
+      }
     } else {
       target = addressTarget(draft.address);
       delete bindings[id];
@@ -127,6 +132,24 @@ export function createEngine(api, { now = () => Date.now(), newId = () => crypto
     } else rule.ignoreAlarmBefore = now();
     const bindings = await readBindings();
     let candidates = [];
+    if (rule.action === 'ensure') {
+      candidates = (await api.tabs.query({})).filter(tab => !tab.incognito && matchesTarget(rule.target, tab.pendingUrl ?? tab.url));
+      if (candidates.length) {
+        rule.state = rule.enabled ? 'ready' : 'paused';
+        result(rule, 'present', `已有 ${candidates.length} 个匹配页签，未重复打开。`);
+      } else {
+        try {
+          await api.tabs.create({ url: rule.target.url, active: false });
+          rule.state = rule.enabled ? 'ready' : 'paused';
+          result(rule, 'opened', '已补开保活页签；页面加载与凭据同步另行确认。');
+        } catch {
+          result(rule, 'error', '保活页签打开失败，将在下次检查时重试。');
+        }
+      }
+      await schedule(rule);
+      await writeRules(rules);
+      return snapshot();
+    }
     if (rule.target.mode === 'tab') {
       const binding = bindings[id];
       if (binding) {
@@ -190,6 +213,11 @@ export function createEngine(api, { now = () => Date.now(), newId = () => crypto
   }
   return {
     ready,
+    async onStartup() {
+      await ready;
+      for (const rule of await readRules()) if (rule.enabled && rule.action === 'ensure') await run(rule.id, 'startup');
+      return snapshot();
+    },
     async message(message) {
       await ready;
       if (message.type === 'run') return run(message.id);

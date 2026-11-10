@@ -26,6 +26,7 @@ function fixture() {
       query: async () => structuredClone([...tabs.values()]),
       get: async id => { if (!tabs.has(id)) throw new Error('No tab'); return structuredClone(tabs.get(id)); },
       reload: async (id, options) => { reloads.push({ id, ...options }); },
+      create: async ({ url }) => { const id = Math.max(...tabs.keys(), 0) + 1; const tab = { id, windowId: 1, url, status: 'loading' }; tabs.set(id, tab); return structuredClone(tab); },
     },
   };
   const create = () => createEngine(api, { now: () => time, newId: () => `id-${++counter}` });
@@ -250,4 +251,72 @@ test('中断的执行只标记为中断，不重新发送；孤立闹钟清理',
   assert.equal(state.rules[0].lastResult.code, 'interrupted');
   assert.equal(f.reloads.length, 0);
   assert.equal(f.alarms.size, 0);
+});
+
+test('保活从选中页签保存网址，重启无需重新绑定且立即补开', async () => {
+  const f = fixture();
+  const rule = await f.save({ action: 'ensure' });
+  assert.equal(rule.target.mode, 'address');
+  assert.equal(f.session.bindings[rule.id], undefined);
+  await f.engine.message({ type: 'toggle', id: rule.id, enabled: true });
+  f.tabs.clear();
+  delete f.session.bindings;
+  const restarted = f.create();
+  const state = await restarted.onStartup();
+  assert.equal(state.rules[0].enabled, true);
+  assert.equal(state.rules[0].lastResult.code, 'opened');
+  assert.equal(f.tabs.size, 1);
+  assert.equal([...f.tabs.values()][0].url, 'https://example.test/dashboard');
+  assert.equal(f.reloads.length, 0);
+});
+test('保活有多个匹配时不新开、不暂停、不刷新；正在打开的页签也算匹配', async () => {
+  const f = fixture();
+  const rule = await f.save({ action: 'ensure', mode: 'address', address: 'https://example.test' });
+  f.tabs.set(8, { id: 8, pendingUrl: 'https://example.test/loading', url: '', status: 'loading' });
+  await f.engine.message({ type: 'toggle', id: rule.id, enabled: true });
+  await f.engine.onStartup();
+  assert.equal(f.tabs.size, 2);
+  f.tabs.delete(7);
+  const state = await f.engine.message({ type: 'run', id: rule.id });
+  assert.equal(state.rules[0].lastResult.code, 'present');
+  assert.equal(state.rules[0].enabled, true);
+  assert.equal(f.tabs.size, 1);
+  assert.equal(f.reloads.length, 0);
+});
+test('普通 worker 唤醒不补开，启动只处理启用的保活条目', async () => {
+  const f = fixture();
+  const paused = await f.save({ action: 'ensure', mode: 'address', address: 'https://paused.test' });
+  const active = await f.save({ action: 'ensure', mode: 'address', address: 'https://active.test' });
+  await f.engine.message({ type: 'toggle', id: active.id, enabled: true });
+  const next = f.create();
+  await next.ready;
+  assert.equal(f.tabs.size, 1);
+  const state = await next.onStartup();
+  assert.equal(f.tabs.size, 2);
+  assert.equal(state.rules.find(r => r.id === paused.id).lastResult, null);
+});
+test('保活页签关闭后继续定时补开；并发检查不会重复创建', async () => {
+  const f = fixture();
+  const rule = await f.save({ action: 'ensure' });
+  await f.engine.message({ type: 'toggle', id: rule.id, enabled: true });
+  f.tabs.delete(7);
+  await f.engine.onRemoved(7);
+  const alarm = [...f.alarms.values()][0];
+  await Promise.all([f.engine.onAlarm(alarm), f.engine.onAlarm(alarm)]);
+  const state = await f.engine.message({ type: 'snapshot' });
+  assert.equal(f.tabs.size, 1);
+  assert.equal(state.rules[0].enabled, true);
+});
+test('保活打开失败保留条目，下一次可恢复且不会动无痕页签', async () => {
+  const f = fixture();
+  const rule = await f.save({ action: 'ensure' });
+  await f.engine.message({ type: 'toggle', id: rule.id, enabled: true });
+  f.tabs.get(7).incognito = true;
+  const create = f.api.tabs.create;
+  f.api.tabs.create = async () => { throw new Error('No window'); };
+  assert.equal((await f.engine.onStartup()).rules[0].lastResult.code, 'error');
+  assert.equal(f.local[DATA_KEY].rules[0].enabled, true);
+  f.api.tabs.create = create;
+  assert.equal((await f.engine.message({ type: 'run', id: rule.id })).rules[0].lastResult.code, 'opened');
+  assert.equal(f.tabs.size, 2);
 });
