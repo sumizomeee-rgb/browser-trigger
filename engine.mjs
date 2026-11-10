@@ -3,6 +3,7 @@ import { ALARM_PREFIX, DATA_KEY, addressTarget, availableTabs, matchesTarget, pa
 export function createEngine(api, { now = () => Date.now(), newId = () => crypto.randomUUID() } = {}) {
   let tail = Promise.resolve();
   const pending = new Set();
+  let startupTask;
   const serial = work => {
     const task = tail.then(work);
     tail = task.catch(() => {});
@@ -214,9 +215,14 @@ export function createEngine(api, { now = () => Date.now(), newId = () => crypto
   return {
     ready,
     async onStartup() {
-      await ready;
-      for (const rule of await readRules()) if (rule.enabled && rule.action === 'ensure') await run(rule.id, 'startup');
-      return snapshot();
+      if (startupTask) return startupTask;
+      startupTask = (async () => {
+        await ready;
+        for (const rule of await readRules()) if (rule.enabled && rule.action === 'ensure') await run(rule.id, 'startup');
+        return snapshot();
+      })();
+      try { return await startupTask; }
+      finally { startupTask = undefined; }
     },
     async message(message) {
       await ready;

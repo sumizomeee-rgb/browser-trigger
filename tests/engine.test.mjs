@@ -320,3 +320,24 @@ test('保活打开失败保留条目，下一次可恢复且不会动无痕页�
   assert.equal((await f.engine.message({ type: 'run', id: rule.id })).rules[0].lastResult.code, 'opened');
   assert.equal(f.tabs.size, 2);
 });
+test('浏览器启动与恢复入口同时触发时，都等待补开完成后再返回', async () => {
+  const f = fixture();
+  const rule = await f.save({ action: 'ensure' });
+  await f.engine.message({ type: 'toggle', id: rule.id, enabled: true });
+  f.tabs.clear();
+  let release, entered;
+  const gate = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { entered = resolve; });
+  const create = f.api.tabs.create;
+  f.api.tabs.create = async values => { entered(); await gate; return create(values); };
+  const first = f.engine.onStartup();
+  await started;
+  let returned = false;
+  const second = f.engine.onStartup().then(value => { returned = true; return value; });
+  await Promise.resolve();
+  assert.equal(returned, false);
+  release();
+  assert.equal((await first).rules[0].lastResult.code, 'opened');
+  assert.equal((await second).rules[0].lastResult.code, 'opened');
+  assert.equal(f.tabs.size, 1);
+});
